@@ -149,7 +149,7 @@ def get_rist_menu(browser, menu_obj: Dict) -> Dict:
         menu = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/ul').text
         iobj = dict()
         iobj["name"] = ":D " + menu_name + "\n"
-        iobj["description"] = menu
+        iobj["description"] = menu.replace('\n',' ')
         obj["menus"][idx-1] = iobj
     menu_obj["stores"].append(obj)
     return menu_obj
