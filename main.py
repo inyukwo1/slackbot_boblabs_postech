@@ -8,7 +8,8 @@ import json
 from bs4 import BeautifulSoup
 import re
 
-# TODO RIST 추가 필요
+from selenium import webdriver
+
 
 def get_postech_menu(menu_obj: Dict) -> Dict:
     url = 'http://fd.postech.ac.kr/bbs/today_menu.php?bo_table=weekly'
@@ -63,7 +64,6 @@ def get_food_court_menu(menu_obj: Dict) -> Dict:
 def post_slackbot(slack_token: str, menu_obj: Dict) -> None:
     slack = Slacker(slack_token)
 
-    # Send a message to #general channel
     slack.chat.post_message('#밥', '★오늘의 식단을 소개합니다★')
 
     inje_obj = menu_obj["stores"][2]
@@ -112,6 +112,16 @@ def post_slackbot(slack_token: str, menu_obj: Dict) -> None:
     slack.chat.post_message('#밥', '푸드코트-중식(양식)-'+foodcourt_obj["menus"][2]["name"] + ":::" +
                             foodcourt_obj["menus"][2]["description"])
 
+    # RIST
+    slack.chat.post_message('#밥', "아래는 POSTECH RIST 식단입니다.")
+    rist_obj = menu_obj["stores"][6]
+    slack.chat.post_message('#밥', 'RIST-아침-'+rist_obj["menus"][0]["name"] + ":::" +
+                            rist_obj["menus"][0]["description"])
+    slack.chat.post_message('#밥', 'RIST-중식-'+rist_obj["menus"][1]["name"] + ":::" +
+                            rist_obj["menus"][1]["description"])
+    slack.chat.post_message('#밥', 'RIST-석식-'+rist_obj["menus"][2]["name"] + ":::" +
+                            rist_obj["menus"][2]["description"])
+
 
 def get_menu(boblab_token: str) -> Dict:
     API_HOST = 'https://bablabs.com/openapi/v1/'
@@ -124,16 +134,41 @@ def get_menu(boblab_token: str) -> Dict:
     return obj
 
 
+def get_rist_menu(browser, menu_obj: Dict) -> Dict:
+    browser.get("https://ssgfoodingplus.com/fmn101.do?goTo=todayMenu&storeCd=05600")
+    time.sleep(3)
+    obj = dict()
+    obj["menus"] = dict()
+    for idx in range(1,4):
+        #print (idx)
+        login_attempt = browser.find_element_by_xpath('//*[@id="mealType"]/li[' + str(idx) + ']/a')
+        login_attempt.click()
+        time.sleep(3)
+
+        menu_name = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/h6').text
+        menu = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/ul').text
+        iobj = dict()
+        iobj["name"] = ":D " + menu_name + "\n"
+        iobj["description"] = menu
+        obj["menus"][idx-1] = iobj
+    menu_obj["stores"].append(obj)
+    return menu_obj
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Gets tokens')
     parser.add_argument("slack_token", help="slack token", type=str)
     parser.add_argument("boblab_token", help="boblab token", type=str)
     args = parser.parse_args()
 
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument('headless')
+    browser = webdriver.Chrome(chrome_options=chrome_options)
+
     while True:
         if time.localtime().tm_hour == 9:
             menu_obj = get_menu(args.boblab_token)
             menu_obj = get_postech_menu(menu_obj)
             menu_obj = get_food_court_menu(menu_obj)
+            menu_obj = get_rist_menu(browser, menu_obj)
             post_slackbot(args.slack_token, menu_obj)
         sleep(3600)
