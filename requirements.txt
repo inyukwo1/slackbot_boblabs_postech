@@ -1,5 +1,4 @@
 slacker
 beautifulsoup4
 lxml
-pyvirtualdisplay
 selenium
