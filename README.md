@@ -1,6 +1,6 @@
 # slackbot_boblabs_postech
 
-* 실행 방법: python main.py "slack token" "bablab token" (token은 나인혁에게 문의하여 받는다.)
+* 실행 방법: python main.py "slack token" "bablab token" [--test True] (token은 나인혁에게 문의하여 받는다.)
 
 
 규칙
