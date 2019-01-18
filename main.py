@@ -1,13 +1,16 @@
 from slacker import Slacker
-from typing import Dict
+from typing import Dict, Tuple
 import requests
 import argparse
 import time
 from time import sleep
-import json
+import json, io, os
 from bs4 import BeautifulSoup
 import re
 from selenium import webdriver
+from google.cloud import vision
+from google.cloud.vision import types
+from PIL import Image
 
 
 def get_postech_menu(menu_obj: Dict) -> Dict:
@@ -62,12 +65,46 @@ def get_food_court_menu(menu_obj: Dict) -> Dict:
     return menu_obj
 
 
+def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
+    weekday = time.localtime().tm_wday
+    if weekday == 5 or weekday == 6:
+        return "토, 일요일에는 점심을 제공하지 않습니다.", "토, 일요일에는 저녁을 제공하지 않습니다."
+
+    left = 75 + 200 * weekday
+    lunch_top = 150
+    dinner_top = 485
+    box_width = 200
+    box_height = 300
+
+    origin_img = Image.open(jpg_path)
+    lunch_img = origin_img.crop((left, lunch_top, left + box_width, lunch_top + box_height))
+    lunch_img.save("lunch_img.jpg")
+    dinner_img = origin_img.crop((left, dinner_top, left + box_width, dinner_top + box_height))
+    dinner_img.save("dinner_img.jpg")
+
+    with open('lunch_img.jpg', 'rb') as image_file:
+        lunch_content = image_file.read()
+    with open('dinner_img.jpg', 'rb') as image_file:
+        dinner_content = image_file.read()
+    lunch_cloud_img = types.Image(content=lunch_content)
+    dinner_cloud_img = types.Image(content=dinner_content)
+    client = vision.ImageAnnotatorClient()
+
+    lunch_response = client.text_detection(image=lunch_cloud_img)
+    lunch_label = lunch_response.text_annotations[0].description.replace("\n", ", ")
+    dinner_response = client.text_detection(image=dinner_cloud_img)
+    dinner_label = dinner_response.text_annotations[0].description.replace("\n", ", ")
+
+    return lunch_label, dinner_label
+
+
 def post_slackbot(slack_token: str, menu_obj: Dict, test: bool=False) -> None:
     slack = Slacker(slack_token)
     channel_name = "#밥_dev" if test else "#밥"
 
     slack.chat.post_message(channel_name, '★오늘의 식단을 소개합니다★')
 
+    # 인재개발원
     inje_obj = menu_obj["stores"][2]
     slack.chat.post_message(channel_name, '♥인재개발원♥-아침-'+inje_obj["menus"][0]["name"] + ":::" +
                             inje_obj["menus"][0]["description"])
@@ -78,13 +115,15 @@ def post_slackbot(slack_token: str, menu_obj: Dict, test: bool=False) -> None:
     slack.chat.post_message(channel_name, '♥인재개발원♥-저녁-'+inje_obj["menus"][3]["name"] + ":::" +
                             inje_obj["menus"][3]["description"])
 
+    # 가속기
     gasok_obj = menu_obj["stores"][3]
     tmp_file_loc = "tmp.jpg"
     with open(tmp_file_loc, 'wb') as f:
         resp = requests.get(gasok_obj["menus"][0]["description"], verify=False)
         f.write(resp.content)
-    slack.chat.post_message(channel_name, "아래는 가속기연구소 식단입니다.")
-    slack.files.upload(tmp_file_loc, channels='#밥', title="가속기연구소 식단")
+    lunch, dinner = ocr_gasokgi_menu(tmp_file_loc)
+    slack.chat.post_message(channel_name, "가속기-점심:::" + lunch)
+    slack.chat.post_message(channel_name, "가속기-저녁:::" + dinner)
 
     # POSTECH 학생 식당
     slack.chat.post_message(channel_name, "아래는 POSTECH 학생식당 식단입니다.")

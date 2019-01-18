@@ -2,3 +2,5 @@ slacker
 beautifulsoup4
 lxml
 selenium
+pillow
+google-cloud-vision
