@@ -2,6 +2,12 @@
 
 * 실행 방법: python main.py "slack token" "bablab token" [--test True] (token은 나인혁에게 문의하여 받는다.)
 
+installation guide
+1. pip install --upgrade google-cloud-storage
+2. pip install -r requirements.txt
+3. brew install chromedriver
+4. export GOOGLE_APPLICATION_CREDENTIALS="./postech-dblab-slackbot-05fa2b0665fc.json" (파일은 나인혁에게 받는다.)
+
 
 규칙
 1. 일주일에 한 시간 이상씩 각자 contribution한다. (어떤 contribution을 해야 하는지는 github issue에 등록)
