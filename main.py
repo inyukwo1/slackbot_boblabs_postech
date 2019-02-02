@@ -70,16 +70,43 @@ def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
     if weekday == 5 or weekday == 6:
         return "토, 일요일에는 점심을 제공하지 않습니다.", "토, 일요일에는 저녁을 제공하지 않습니다."
 
-    left = 75 + 200 * weekday
-    lunch_top = 150
-    dinner_top = 485
-    box_width = 200
-    box_height = 300
-
     origin_img = Image.open(jpg_path)
-    lunch_img = origin_img.crop((left, lunch_top, left + box_width, lunch_top + box_height))
+    double_lunch = False
+    if origin_img.width > 1300:
+        if weekday < 2:
+            left = 75 + 200 * weekday
+            lunch_top = 150
+            dinner_top = 485
+            lunch_box_width = 200
+            dinner_box_width = 200
+            box_height = 300
+        elif weekday > 2:
+            left = 75 + 200 * (weekday + 1)
+            lunch_top = 150
+            dinner_top = 485
+            lunch_box_width = 200
+            dinner_box_width = 200
+            box_height = 300
+        else:
+            left = 475
+            lunch2_left = 675
+            lunch_top = 150
+            dinner_top = 485
+            lunch_box_width = 200
+            dinner_box_width = 400
+            box_height = 300
+            double_lunch = True
+    else:
+        left = 75 + 200 * weekday
+        lunch_top = 150
+        dinner_top = 485
+        lunch_box_width = 200
+        dinner_box_width = 200
+        box_height = 300
+
+    lunch_img = origin_img.crop((left, lunch_top, left + lunch_box_width, lunch_top + box_height))
     lunch_img.save("lunch_img.jpg")
-    dinner_img = origin_img.crop((left, dinner_top, left + box_width, dinner_top + box_height))
+    dinner_img = origin_img.crop((left, dinner_top, left + dinner_box_width, dinner_top + box_height))
     dinner_img.save("dinner_img.jpg")
 
     with open('lunch_img.jpg', 'rb') as image_file:
@@ -94,6 +121,16 @@ def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
     lunch_label = lunch_response.text_annotations[0].description.replace("\n", ", ")
     dinner_response = client.text_detection(image=dinner_cloud_img)
     dinner_label = dinner_response.text_annotations[0].description.replace("\n", ", ")
+
+    if double_lunch:
+        lunch_img2 = origin_img.crop((lunch2_left, lunch_top, lunch2_left + lunch_box_width, lunch_top + box_height))
+        lunch_img2.save("lunch_img2.jpg")
+        with open('lunch_img2.jpg', 'rb') as image_file:
+            lunch_content = image_file.read()
+        lunch2_cloud_img = types.Image(content=lunch_content)
+        lunch2_response = client.text_detection(image=lunch2_cloud_img)
+        lunch2_label = lunch2_response.text_annotations[0].description.replace("\n", ", ")
+        lunch_label += "//menu B: " + lunch2_label
 
     return lunch_label, dinner_label
 
