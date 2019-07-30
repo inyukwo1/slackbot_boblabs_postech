@@ -1,5 +1,5 @@
 from slacker import Slacker
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 import requests
 import argparse
 import time
@@ -13,31 +13,29 @@ from google.cloud.vision import types
 from PIL import Image
 
 
-def get_postech_menu(menu_obj: Dict) -> Dict:
+def get_postech_menu() -> List:
     url = 'http://fd.postech.ac.kr/bbs/today_menu.php?bo_table=weekly'
     html = requests.get(url)
     html.encoding='utf-8'
     html = html.text
     soup = BeautifulSoup(html, 'lxml')
     tags = soup.find_all('td', class_='txtheight')
-    i, obj = 0, dict()
-    obj["menus"] = dict()
-    for tag in tags:
+    obj = []
+    name_list = ["조식A", "조식B", "중식", "석식", "교직원"]
+    for idx, tag in enumerate(tags):
         description = tag.get_text().encode('utf-8','strict')
         description = description.decode('utf-8','strict')
         iobj = dict()
-        iobj["name"] = ""
+        iobj["name"] = name_list[idx]
         description = description.replace('\n',' ').replace('\r', ' ').replace('&',' ')
         description = re.sub('[a-zA-z]*', '', description).replace('"', '')
         description = re.sub('[\s]+', ' ', description)
         iobj["description"] = description
-        obj["menus"][i] = iobj
-        i += 1
-    menu_obj["stores"][4] = obj
-    return menu_obj
+        obj.append(iobj)
+    return obj
 
 
-def get_food_court_menu(menu_obj: Dict) -> Dict:
+def get_food_court_menu() -> List:
     url = "http://fd.postech.ac.kr/bbs/board.php?bo_table=food_court"
     html = requests.get(url)
     html.encoding = "utf-8"
@@ -50,8 +48,7 @@ def get_food_court_menu(menu_obj: Dict) -> Dict:
     soup = BeautifulSoup(html.text, 'lxml')
     tables = soup.find_all('table')
     contents = tables[3].find_all('td')
-    j, obj = 0, dict()
-    obj["menus"] = dict()
+    j, obj = 0, []
     for i in [8, 12, 13]:
         description = contents[i].get_text().replace('+',' ').replace('-',' ').replace('\n',' ').replace('\r', ' ').replace('&',' ')
         description = re.sub('[a-zA-z]*', '', description).replace('"', '')
@@ -59,10 +56,8 @@ def get_food_court_menu(menu_obj: Dict) -> Dict:
         iobj = dict()
         iobj["name"] = ""
         iobj["description"] = description
-        obj["menus"][j] = iobj
-        j += 1
-    menu_obj["stores"][5] = obj
-    return menu_obj
+        obj.append(iobj)
+    return obj
 
 
 def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
@@ -135,88 +130,35 @@ def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
     return lunch_label, dinner_label
 
 
-def post_slackbot(slack_token: str, menu_obj: Dict, test: bool=False) -> None:
+def post_slackbot(slack_token: str, inje_menu, gasok_menu, postech_menu, foodcourt_menu, rist_menu, test: bool=False) -> None:
     slack = Slacker(slack_token)
     channel_name = "#밥_dev" if test else "#밥"
 
     slack.chat.post_message(channel_name, '★오늘의 식단을 소개합니다★')
 
     # 인재개발원
-    inje_obj = menu_obj["stores"][2]
-    slack.chat.post_message(channel_name, '♥인재개발원♥-아침-'+inje_obj["menus"][0]["name"] + ":::" +
-                            inje_obj["menus"][0]["description"])
-    slack.chat.post_message(channel_name, '♥인재개발원♥-점심-'+inje_obj["menus"][1]["name"] + ":::" +
-                            inje_obj["menus"][1]["description"])
-    slack.chat.post_message(channel_name, '♥인재개발원♥-점심-'+inje_obj["menus"][2]["name"] + ":::" +
-                            inje_obj["menus"][2]["description"])
-    slack.chat.post_message(channel_name, '♥인재개발원♥-저녁-'+inje_obj["menus"][3]["name"] + ":::" +
-                            inje_obj["menus"][3]["description"])
+    for menu in inje_menu:
+        slack.chat.post_message(channel_name, '♥인재개발원♥-'+menu["name"] + ":::" + menu["description"])
 
     # 가속기
-    gasok_obj = menu_obj["stores"][3]
-    tmp_file_loc = "tmp.jpg"
-    with open(tmp_file_loc, 'wb') as f:
-        resp = requests.get(gasok_obj["menus"][0]["description"], verify=False)
-        f.write(resp.content)
-    lunch, dinner = ocr_gasokgi_menu(tmp_file_loc)
-    slack.chat.post_message(channel_name, "가속기-점심:::" + lunch)
-    slack.chat.post_message(channel_name, "가속기-저녁:::" + dinner)
+    for menu in gasok_menu:
+        slack.chat.post_message(channel_name, '♥가속기♥-'+menu["name"] + ":::" + menu["description"])
 
-    # POSTECH 학생 식당
-    slack.chat.post_message(channel_name, "아래는 POSTECH 학생식당 식단입니다.")
-    student_obj = menu_obj["stores"][4]
-    slack.chat.post_message(channel_name, '학생식당-아침 A-'+student_obj["menus"][0]["name"] + ":::" +
-                            student_obj["menus"][0]["description"])
-    slack.chat.post_message(channel_name, '학생식당-아침 B-'+student_obj["menus"][1]["name"] + ":::" +
-                            student_obj["menus"][1]["description"])
-    slack.chat.post_message(channel_name, '학생식당-점심-'+student_obj["menus"][2]["name"] + ":::" +
-                            student_obj["menus"][2]["description"])
-    slack.chat.post_message(channel_name, '학생식당-저녁-'+student_obj["menus"][3]["name"] + ":::" +
-                           student_obj["menus"][3]["description"])
-
-    # POSTECH 교직원 식당
-    slack.chat.post_message(channel_name, "아래는 POSTECH 교직원식당 식단입니다.")
-    educational_personnel_obj = menu_obj["stores"][4]
-    slack.chat.post_message(channel_name, '교직원식당-아침 A-'+educational_personnel_obj["menus"][4]["name"] + ":::" +
-                            educational_personnel_obj["menus"][4]["description"])
+    for menu in postech_menu:
+        slack.chat.post_message(channel_name, '♥학생식당♥-'+menu["name"] + ":::" + menu["description"])
 
     # POSTECH 푸드코트
-    slack.chat.post_message(channel_name, "아래는 POSTECH 푸드코트 식단입니다.")
-    foodcourt_obj = menu_obj["stores"][5]
-    slack.chat.post_message(channel_name, '푸드코트-아침(한식)-'+foodcourt_obj["menus"][0]["name"] + ":::" +
-                            foodcourt_obj["menus"][0]["description"])
-    slack.chat.post_message(channel_name, '푸드코트-중식(한식)-'+foodcourt_obj["menus"][1]["name"] + ":::" +
-                            foodcourt_obj["menus"][1]["description"])
-    slack.chat.post_message(channel_name, '푸드코트-중식(양식)-'+foodcourt_obj["menus"][2]["name"] + ":::" +
-                            foodcourt_obj["menus"][2]["description"])
+    for menu in foodcourt_menu:
+        slack.chat.post_message(channel_name, '♥푸드코트♥-'+menu["name"] + ":::" + menu["description"])
 
     # RIST
-    slack.chat.post_message(channel_name, "아래는 POSTECH RIST 식단입니다.")
-    rist_obj = menu_obj["stores"][6]
-    slack.chat.post_message(channel_name, 'RIST-아침-'+rist_obj["menus"][0]["name"] + ":::" +
-                            rist_obj["menus"][0]["description"])
-    slack.chat.post_message(channel_name, 'RIST-중식-'+rist_obj["menus"][1]["name"] + ":::" +
-                            rist_obj["menus"][1]["description"])
-    slack.chat.post_message(channel_name, 'RIST-석식-'+rist_obj["menus"][2]["name"] + ":::" +
-                            rist_obj["menus"][2]["description"])
+    for menu in rist_menu:
+        slack.chat.post_message(channel_name, '♥RIST♥-'+menu["name"] + ":::" + menu["description"])
 
-
-def get_menu(boblab_token: str) -> Dict:
-    API_HOST = 'https://bablabs.com/openapi/v1/'
-    POSTECH_TOKEN = '3hXYy5crHG'
-    headers = {'Accesstoken': boblab_token}
-
-    query = {"date": time.strftime("%Y-%m-%d")}
-    resp = requests.get(API_HOST + '/campuses/' + POSTECH_TOKEN + '/stores', params=query, headers=headers)
-    obj = json.loads(resp.text)
-    return obj
-
-
-def get_rist_menu(browser, menu_obj: Dict) -> Dict:
+def get_rist_menu(browser) -> List:
     browser.get("https://ssgfoodingplus.com/fmn101.do?goTo=todayMenu&storeCd=05600")
     time.sleep(3)
-    obj = dict()
-    obj["menus"] = dict()
+    obj = []
     for idx in range(1, 4):
         login_attempt = browser.find_element_by_xpath('//*[@id="mealType"]/li[' + str(idx) + ']/a')
         login_attempt.click()
@@ -227,15 +169,68 @@ def get_rist_menu(browser, menu_obj: Dict) -> Dict:
         iobj = dict()
         iobj["name"] = ":D " + menu_name + "\n"
         iobj["description"] = menu.replace('\n',' ')
-        obj["menus"][idx-1] = iobj
-    menu_obj["stores"].append(obj)
-    return menu_obj
+        obj.append(iobj)
+    return obj
+
+
+def get_inje_menu(browser):
+    browser.get("https://www.poswel.co.kr/fmenu/three_days.php?area_code=A4&amp")
+    time.sleep(3)
+    obj = []
+    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[1]/div[2]/strong').text
+    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[2]/span[1]').text
+    iobj = dict()
+    iobj["name"] = ":D " + menu_name + "\n"
+    iobj["description"] = menu.replace('\n',' ')
+    obj.append(iobj)
+
+    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[1]/div[2]/strong').text
+    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[2]/span[1]').text
+    iobj = dict()
+    iobj["name"] = ":D " + menu_name + "\n"
+    iobj["description"] = menu.replace('\n',' ')
+    obj.append(iobj)
+
+    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[1]/div[2]/strong').text
+    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[2]/span[1]').text
+    iobj = dict()
+    iobj["name"] = ":D " + menu_name + "\n"
+    iobj["description"] = menu.replace('\n',' ')
+    obj.append(iobj)
+
+
+    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[1]/div[2]/strong').text
+    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[2]/span[1]').text
+    iobj = dict()
+    iobj["name"] = ":D " + menu_name + "\n"
+    iobj["description"] = menu.replace('\n',' ')
+    obj.append(iobj)
+
+    return obj
+
+
+def get_gasok_menu(browser):
+    browser.get("https://bds.bablabs.com/restaurants?campus_id=3hXYy5crHG")
+    time.sleep(3)
+    obj = []
+    menu_img = browser.find_element_by_xpath('//*[@id="app"]/div[1]/div/div/div/div[6]/div[2]/div/div/div/div[2]/div[2]/div/img').get_attribute('src')
+
+    tmp_file_loc = "tmp.jpg"
+    with open(tmp_file_loc, 'wb') as f:
+        resp = requests.get(menu_img, verify=False)
+        f.write(resp.content)
+    lunch, dinner = ocr_gasokgi_menu(tmp_file_loc)
+    obj.append({"name": "점심",
+                "description": lunch})
+    obj.append({"name": "저녁",
+                "description": dinner})
+
+    return obj
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Gets tokens')
     parser.add_argument("slack_token", help="slack token", type=str)
-    parser.add_argument("boblab_token", help="boblab token", type=str)
     parser.add_argument("--test", help="if specified, run for test")
     args = parser.parse_args()
 
@@ -245,17 +240,19 @@ if __name__ == "__main__":
 
     if args.test:
         test = True
-        menu_obj = get_menu(args.boblab_token)
-        menu_obj = get_postech_menu(menu_obj)
-        menu_obj = get_food_court_menu(menu_obj)
-        menu_obj = get_rist_menu(browser, menu_obj)
-        post_slackbot(args.slack_token, menu_obj, test)
+        inje_menu = get_inje_menu(browser)
+        gasok_menu = get_gasok_menu(browser)
+        postech_menu = get_postech_menu()
+        foodcourt_menu = get_food_court_menu()
+        rist_menu = get_rist_menu(browser)
+        post_slackbot(args.slack_token, inje_menu, gasok_menu, postech_menu, foodcourt_menu, rist_menu, test)
     else:
         while True:
             if time.localtime().tm_hour == 9:
-                menu_obj = get_menu(args.boblab_token)
-                menu_obj = get_postech_menu(menu_obj)
-                menu_obj = get_food_court_menu(menu_obj)
-                menu_obj = get_rist_menu(browser, menu_obj)
-                post_slackbot(args.slack_token, menu_obj)
+                inje_menu = get_inje_menu(browser)
+                gasok_menu = get_gasok_menu(browser)
+                postech_menu = get_postech_menu()
+                foodcourt_menu = get_food_court_menu()
+                rist_menu = get_rist_menu(browser)
+                post_slackbot(args.slack_token, inje_menu, gasok_menu, postech_menu, foodcourt_menu, rist_menu)
             sleep(3600)
