@@ -14,50 +14,56 @@ from PIL import Image
 
 
 def get_postech_menu() -> List:
-    url = 'http://fd.postech.ac.kr/bbs/today_menu.php?bo_table=weekly'
-    html = requests.get(url)
-    html.encoding='utf-8'
-    html = html.text
-    soup = BeautifulSoup(html, 'lxml')
-    tags = soup.find_all('td', class_='txtheight')
-    obj = []
-    name_list = ["조식A", "조식B", "중식", "석식", "교직원"]
-    for idx, tag in enumerate(tags):
-        description = tag.get_text().encode('utf-8','strict')
-        description = description.decode('utf-8','strict')
-        iobj = dict()
-        iobj["name"] = name_list[idx]
-        description = description.replace('\n',' ').replace('\r', ' ').replace('&',' ')
-        description = re.sub('[a-zA-z]*', '', description).replace('"', '')
-        description = re.sub('[\s]+', ' ', description)
-        iobj["description"] = description
-        obj.append(iobj)
-    return obj
+    try:
+        url = 'http://fd.postech.ac.kr/bbs/today_menu.php?bo_table=weekly'
+        html = requests.get(url)
+        html.encoding='utf-8'
+        html = html.text
+        soup = BeautifulSoup(html, 'lxml')
+        tags = soup.find_all('td', class_='txtheight')
+        obj = []
+        name_list = ["조식A", "조식B", "중식", "석식", "교직원"]
+        for idx, tag in enumerate(tags):
+            description = tag.get_text().encode('utf-8','strict')
+            description = description.decode('utf-8','strict')
+            iobj = dict()
+            iobj["name"] = name_list[idx]
+            description = description.replace('\n',' ').replace('\r', ' ').replace('&',' ')
+            description = re.sub('[a-zA-z]*', '', description).replace('"', '')
+            description = re.sub('[\s]+', ' ', description)
+            iobj["description"] = description
+            obj.append(iobj)
+        return obj
+    except:
+        return []
 
 
 def get_food_court_menu() -> List:
-    url = "http://fd.postech.ac.kr/bbs/board.php?bo_table=food_court"
-    html = requests.get(url)
-    html.encoding = "utf-8"
-    soup = BeautifulSoup(html.text, 'lxml')
-    tags = soup.find_all('td', class_='num')#href=re.compile('wr_id'))
-    wr_id = int(tags[0].get_text().strip()) + 2
-    url = "http://fd.postech.ac.kr/bbs/board.php?bo_table=food_court&wr_id=%d" % wr_id
-    html = requests.get(url)
-    html.encoding = "utf-8"
-    soup = BeautifulSoup(html.text, 'lxml')
-    tables = soup.find_all('table')
-    contents = tables[3].find_all('td')
-    j, obj = 0, []
-    for i in [8, 12, 13]:
-        description = contents[i].get_text().replace('+',' ').replace('-',' ').replace('\n',' ').replace('\r', ' ').replace('&',' ')
-        description = re.sub('[a-zA-z]*', '', description).replace('"', '')
-        description = re.sub('[\s]+', ' ', description)
-        iobj = dict()
-        iobj["name"] = ""
-        iobj["description"] = description
-        obj.append(iobj)
-    return obj
+    try:
+        url = "http://fd.postech.ac.kr/bbs/board.php?bo_table=food_court"
+        html = requests.get(url)
+        html.encoding = "utf-8"
+        soup = BeautifulSoup(html.text, 'lxml')
+        tags = soup.find_all('td', class_='num')#href=re.compile('wr_id'))
+        wr_id = int(tags[0].get_text().strip()) + 2
+        url = "http://fd.postech.ac.kr/bbs/board.php?bo_table=food_court&wr_id=%d" % wr_id
+        html = requests.get(url)
+        html.encoding = "utf-8"
+        soup = BeautifulSoup(html.text, 'lxml')
+        tables = soup.find_all('table')
+        contents = tables[3].find_all('td')
+        j, obj = 0, []
+        for i in [8, 12, 13]:
+            description = contents[i].get_text().replace('+',' ').replace('-',' ').replace('\n',' ').replace('\r', ' ').replace('&',' ')
+            description = re.sub('[a-zA-z]*', '', description).replace('"', '')
+            description = re.sub('[\s]+', ' ', description)
+            iobj = dict()
+            iobj["name"] = ""
+            iobj["description"] = description
+            obj.append(iobj)
+        return obj
+    except:
+        return []
 
 
 def ocr_gasokgi_menu(jpg_path: str) -> Tuple[str, str]:
@@ -156,76 +162,85 @@ def post_slackbot(slack_token: str, inje_menu, gasok_menu, postech_menu, foodcou
         slack.chat.post_message(channel_name, '♥RIST♥-'+menu["name"] + ":::" + menu["description"])
 
 def get_rist_menu(browser) -> List:
-    browser.get("https://ssgfoodingplus.com/fmn101.do?goTo=todayMenu&storeCd=05600")
-    time.sleep(3)
-    obj = []
-    for idx in range(1, 4):
-        login_attempt = browser.find_element_by_xpath('//*[@id="mealType"]/li[' + str(idx) + ']/a')
-        login_attempt.click()
+    try:
+        browser.get("https://ssgfoodingplus.com/fmn101.do?goTo=todayMenu&storeCd=05600")
         time.sleep(3)
+        obj = []
+        for idx in range(1, 4):
+            login_attempt = browser.find_element_by_xpath('//*[@id="mealType"]/li[' + str(idx) + ']/a')
+            login_attempt.click()
+            time.sleep(3)
 
-        menu_name = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/h6').text
-        menu = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/ul').text
+            menu_name = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/h6').text
+            menu = browser.find_element_by_xpath('//*[@id="menuForm"]/section/article/div[4]/div/ul').text
+            iobj = dict()
+            iobj["name"] = ":D " + menu_name + "\n"
+            iobj["description"] = menu.replace('\n',' ')
+            obj.append(iobj)
+        return obj
+    except:
+        return []
+
+
+def get_inje_menu(browser):
+    try:
+        browser.get("https://www.poswel.co.kr/fmenu/three_days.php?area_code=A4&amp")
+        time.sleep(3)
+        obj = []
+        menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[1]/div[2]/strong').text
+        menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[2]/span[1]').text
         iobj = dict()
         iobj["name"] = ":D " + menu_name + "\n"
         iobj["description"] = menu.replace('\n',' ')
         obj.append(iobj)
-    return obj
+
+        menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[1]/div[2]/strong').text
+        menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[2]/span[1]').text
+        iobj = dict()
+        iobj["name"] = ":D " + menu_name + "\n"
+        iobj["description"] = menu.replace('\n',' ')
+        obj.append(iobj)
+
+        menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[1]/div[2]/strong').text
+        menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[2]/span[1]').text
+        iobj = dict()
+        iobj["name"] = ":D " + menu_name + "\n"
+        iobj["description"] = menu.replace('\n',' ')
+        obj.append(iobj)
 
 
-def get_inje_menu(browser):
-    browser.get("https://www.poswel.co.kr/fmenu/three_days.php?area_code=A4&amp")
-    time.sleep(3)
-    obj = []
-    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[1]/div[2]/strong').text
-    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[2]/div/div[2]/span[1]').text
-    iobj = dict()
-    iobj["name"] = ":D " + menu_name + "\n"
-    iobj["description"] = menu.replace('\n',' ')
-    obj.append(iobj)
+        menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[1]/div[2]/strong').text
+        menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[2]/span[1]').text
+        iobj = dict()
+        iobj["name"] = ":D " + menu_name + "\n"
+        iobj["description"] = menu.replace('\n',' ')
+        obj.append(iobj)
 
-    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[1]/div[2]/strong').text
-    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[3]/div/div[2]/span[1]').text
-    iobj = dict()
-    iobj["name"] = ":D " + menu_name + "\n"
-    iobj["description"] = menu.replace('\n',' ')
-    obj.append(iobj)
-
-    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[1]/div[2]/strong').text
-    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[4]/div/div[2]/span[1]').text
-    iobj = dict()
-    iobj["name"] = ":D " + menu_name + "\n"
-    iobj["description"] = menu.replace('\n',' ')
-    obj.append(iobj)
-
-
-    menu_name = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[1]/div[2]/strong').text
-    menu = browser.find_element_by_xpath('//*[@id="list_3day"]/div[1]/div[5]/div/div[2]/span[1]').text
-    iobj = dict()
-    iobj["name"] = ":D " + menu_name + "\n"
-    iobj["description"] = menu.replace('\n',' ')
-    obj.append(iobj)
-
-    return obj
+        return obj
+    except:
+        return []
 
 
 def get_gasok_menu(browser):
-    browser.get("https://bds.bablabs.com/restaurants?campus_id=3hXYy5crHG")
-    time.sleep(3)
-    obj = []
-    menu_img = browser.find_element_by_xpath('//*[@id="app"]/div[1]/div/div/div/div[6]/div[2]/div/div/div/div[2]/div[2]/div/img').get_attribute('src')
+    try:
+        browser.get("https://bds.bablabs.com/restaurants?campus_id=3hXYy5crHG")
+        time.sleep(3)
+        obj = []
+        menu_img = browser.find_element_by_xpath('//*[@id="app"]/div[1]/div/div/div/div[6]/div[2]/div/div/div/div[2]/div[2]/div/img').get_attribute('src')
 
-    tmp_file_loc = "tmp.jpg"
-    with open(tmp_file_loc, 'wb') as f:
-        resp = requests.get(menu_img, verify=False)
-        f.write(resp.content)
-    lunch, dinner = ocr_gasokgi_menu(tmp_file_loc)
-    obj.append({"name": "점심",
-                "description": lunch})
-    obj.append({"name": "저녁",
-                "description": dinner})
+        tmp_file_loc = "tmp.jpg"
+        with open(tmp_file_loc, 'wb') as f:
+            resp = requests.get(menu_img, verify=False)
+            f.write(resp.content)
+        lunch, dinner = ocr_gasokgi_menu(tmp_file_loc)
+        obj.append({"name": "점심",
+                    "description": lunch})
+        obj.append({"name": "저녁",
+                    "description": dinner})
 
-    return obj
+        return obj
+    except:
+        return []
 
 
 if __name__ == "__main__":
@@ -236,7 +251,7 @@ if __name__ == "__main__":
 
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('headless')
-    browser = webdriver.Chrome(chrome_options=chrome_options)
+    browser = webdriver.Chrome('./chromedriver', chrome_options=chrome_options)
 
     if args.test:
         test = True
@@ -249,10 +264,12 @@ if __name__ == "__main__":
     else:
         while True:
             if time.localtime().tm_hour == 9:
-                inje_menu = get_inje_menu(browser)
-                gasok_menu = get_gasok_menu(browser)
-                postech_menu = get_postech_menu()
-                foodcourt_menu = get_food_court_menu()
-                rist_menu = get_rist_menu(browser)
-                post_slackbot(args.slack_token, inje_menu, gasok_menu, postech_menu, foodcourt_menu, rist_menu)
+                weekday = time.localtime().tm_wday
+                if weekday != 5 and weekday != 6:
+                    inje_menu = get_inje_menu(browser)
+                    gasok_menu = get_gasok_menu(browser)
+                    postech_menu = get_postech_menu()
+                    foodcourt_menu = get_food_court_menu()
+                    rist_menu = get_rist_menu(browser)
+                    post_slackbot(args.slack_token, inje_menu, gasok_menu, postech_menu, foodcourt_menu, rist_menu)
             sleep(3600)
